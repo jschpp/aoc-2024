@@ -1,12 +1,6 @@
 use std::{cmp::Ordering, collections::HashMap};
 
-use nom::{
-    bytes::complete::tag,
-    character::complete::{self, line_ending},
-    multi::separated_list1,
-    sequence::separated_pair,
-    IResult,
-};
+use nom::{bytes::complete::tag, character::complete::{self, line_ending}, multi::separated_list1, sequence::separated_pair, IResult};
 
 #[derive(Debug, Default)]
 struct SpecialNumberOrdering {
