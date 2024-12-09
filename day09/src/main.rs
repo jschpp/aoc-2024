@@ -1,21 +1,19 @@
 use std::{
     fmt::{Debug, Display},
-    num::IntErrorKind,
     ops::AddAssign,
     str::FromStr,
 };
 
 fn main() {
     let input = include_str!("../input.txt");
-    let layout = DiskLayout::from_str(input).expect("valid");
+    let layout = DiskLayout::from_str(input).expect("layout should be valid");
     let mut part1 = layout.clone();
     part1.compact_part1();
     println!("part1 checksum {}", part1.checksum());
 
     let mut part2 = layout.clone();
-    // let mut part2 = DiskLayout::from_str("2333133121414131402").expect("valid layout");
     part2.compact_part2();
-    println!("part1 checksum {}", part2.checksum());
+    println!("part2 checksum {}", part2.checksum());
 }
 
 #[derive(Debug, Clone)]
@@ -28,14 +26,18 @@ impl DiskLayout {
         let mut left_pointer: usize = 0;
         let mut right_pointer: usize = self.layout.len() - 1;
         while left_pointer < right_pointer {
+            // move pointer to the next free slot
             if self.layout[left_pointer] != BlockType::Free {
                 left_pointer += 1;
                 continue;
             }
+
+            // move pointer to the next slot which contains a file
             if self.layout[right_pointer] == BlockType::Free {
                 right_pointer -= 1;
                 continue;
             }
+
             self.layout.swap(left_pointer, right_pointer);
         }
     }
@@ -50,28 +52,23 @@ impl DiskLayout {
                 BlockType::File(val) => Some(val),
             })
             .next()
-            .expect("at least one block");
-        last_found_id.add_assign(1);
-        while let Some(id) = last_found_id.checked_sub(1) {
-            last_found_id = id;
-            let current_block = self.find_next_block_to_move(id);
-            if let Some(free_space) = self.find_free_block(current_block.size) {
-                let mut left_pointer: usize = free_space;
-                let mut right_pointer: usize = current_block.end;
-                if left_pointer >= current_block.start {
-                    continue;
-                }
-                for _ in 0..current_block.size {
-                    self.layout.swap(left_pointer, right_pointer);
-                    left_pointer += 1;
-                    right_pointer -= 1;
+            .expect("layout should contain at least one block");
+        last_found_id.add_assign(1); // since the loops starts by running a sub we need to add one here
+        while let Some(new_id) = last_found_id.checked_sub(1) {
+            last_found_id = new_id;
+
+            let next_block = self.find_block_info(last_found_id);
+            if let Some(free_space_start) = self.find_free_block(next_block.size, next_block.start)
+            {
+                for i in 0..next_block.size {
+                    self.layout.swap(free_space_start + i, next_block.end - i);
                 }
             }
         }
     }
 
-    fn find_free_block(&self, length: usize) -> Option<usize> {
-        self.layout
+    fn find_free_block(&self, length: usize, max_idx: usize) -> Option<usize> {
+        self.layout[0..max_idx] // only need to check left from the start of our block
             .windows(length)
             .enumerate()
             .filter_map(|(start, v)| {
@@ -84,7 +81,7 @@ impl DiskLayout {
             .next()
     }
 
-    fn find_next_block_to_move(&self, id: usize) -> BlockInfo {
+    fn find_block_info(&self, id: usize) -> BlockInfo {
         let x = self
             .layout
             .iter()
@@ -108,23 +105,6 @@ impl DiskLayout {
     }
 }
 
-#[derive(Debug)]
-struct BlockInfo {
-    start: usize,
-    end: usize,
-    size: usize,
-}
-
-impl BlockInfo {
-    pub fn new(start: usize, end: usize) -> Self {
-        Self {
-            start,
-            end,
-            size: 1 + end - start,
-        }
-    }
-}
-
 impl Display for DiskLayout {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for block in self.layout.iter() {
@@ -135,13 +115,14 @@ impl Display for DiskLayout {
 }
 
 impl FromStr for DiskLayout {
-    type Err = IntErrorKind;
+    type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let v = s
+        let v: Vec<usize> = s
             .chars()
-            .map(|c| c.to_digit(10).expect("valid num") as usize)
-            .collect::<Vec<usize>>();
+            .filter_map(|c| c.to_digit(10))
+            .map(|x| x as usize)
+            .collect();
         let mut layout: Vec<BlockType> = Vec::default();
         let mut found_files = 0_usize;
         for (idx, block_size) in v.iter().enumerate() {
@@ -157,6 +138,23 @@ impl FromStr for DiskLayout {
             layout.append(&mut vec![b; *block_size]);
         }
         Ok(DiskLayout { layout })
+    }
+}
+
+#[derive(Debug)]
+struct BlockInfo {
+    start: usize,
+    end: usize,
+    size: usize,
+}
+
+impl BlockInfo {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self {
+            start,
+            end,
+            size: 1 + end - start,
+        }
     }
 }
 
