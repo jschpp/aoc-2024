@@ -1,11 +1,9 @@
 use std::{
     collections::HashSet,
-    ops::{self, Add},
-    sync::{Arc, RwLock},
+    ops::{self, Add, Index},
 };
 #[macro_use]
 extern crate impl_ops;
-
 use grid::Grid;
 
 fn main() {
@@ -19,12 +17,26 @@ fn main() {
         })
         .collect();
     let grid = grid.into();
-    let result = solve(grid);
-    // dbg!(get_valid_neighbours(&grid, &Point(0, 0)));
-    println!("{result}");
+
+    println!("part1 {}", part1(&grid));
+    println!("part2 {}", part2(&grid));
 }
 
-fn solve(grid: Grid<usize>) -> usize {
+fn part1(grid: &Grid<usize>) -> usize {
+    let chains = solve(grid);
+    chains
+        .iter()
+        .map(|chain| (chain[0], chain[chain.len() - 1]))
+        .collect::<HashSet<(Point, Point)>>()
+        .len()
+}
+
+fn part2(grid: &Grid<usize>) -> usize {
+    let chains = solve(grid);
+    chains.len()
+}
+
+fn solve(grid: &Grid<usize>) -> Vec<Vec<Point>> {
     let starting_pos: Vec<Point> = grid
         .indexed_iter()
         .filter(|((_, _), x)| **x == 0)
@@ -32,45 +44,37 @@ fn solve(grid: Grid<usize>) -> usize {
         .collect();
     starting_pos
         .into_iter()
-        .map(|p| {
-            let reached_nine: Arc<RwLock<HashSet<Point>>> =
-                Arc::new(RwLock::new(HashSet::default()));
+        .flat_map(|p| {
             let chain = vec![p];
-            travel(chain, &grid, reached_nine.clone())
+            travel(chain, grid)
         })
-        .sum()
+        .collect()
 }
 
-fn travel(
-    chain: Vec<Point>,
-    grid: &Grid<usize>,
-    reached_nine: Arc<RwLock<HashSet<Point>>>,
-) -> usize {
+fn travel(chain: Vec<Point>, grid: &Grid<usize>) -> Vec<Vec<Point>> {
     // check is chain is complete
-    if chain.iter().map(|p| grid[p.into()]).collect::<Vec<usize>>()
-        == vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    {
-        // Enable this for part1
-        // reached_nine.write().unwrap().insert(chain[chain.len() - 1]);
-        return 1;
+    // since we only add valid (bigger by one number) candidates to a chain the chain must me correct after hitting 10 nodes
+    if chain.len() == 10 {
+        return vec![chain];
     }
     let next = &chain[chain.len() - 1];
     let n: Vec<Point> = get_valid_neighbours(grid, next)
         .into_iter()
-        .filter(|p| {
-            grid[(*p).into()] - grid[next.into()] == 1 && !reached_nine.read().unwrap().contains(p)
-        })
+        .filter(|p| grid[p] - grid[next] == 1)
         .collect();
     if n.is_empty() {
-        return 0;
+        return Vec::default();
     }
     n.iter()
-        .map(|next| {
+        .flat_map(|next| {
             let mut tmp_chain = chain.clone();
             tmp_chain.push(*next);
-            travel(tmp_chain, grid, reached_nine.clone())
+            travel(tmp_chain, grid)
+                .into_iter()
+                .filter(|x| x.len() == 10)
+                .collect::<Vec<_>>()
         })
-        .sum()
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -79,6 +83,22 @@ struct Point(usize, usize);
 impl From<Point> for (usize, usize) {
     fn from(value: Point) -> Self {
         (value.0, value.1)
+    }
+}
+
+impl<T> Index<Point> for Grid<T> {
+    type Output = T;
+
+    fn index(&self, index: Point) -> &Self::Output {
+        &self[(index.0, index.1)]
+    }
+}
+
+impl<T> Index<&Point> for Grid<T> {
+    type Output = T;
+
+    fn index(&self, index: &Point) -> &Self::Output {
+        &self[*index]
     }
 }
 
@@ -126,6 +146,10 @@ impl Add<(i32, i32)> for &Point {
 
 impl_op_ex!(+ |a: &Point, b: &Point| -> Point { Point(a.0 + b.0, a.1 + b.1)});
 
+/// get the valid cardinal neighbour for a given position in the grid
+///
+/// checks wether the neighbours are in the grid or not
+/// Will return an empty vector if there are no neighbours
 fn get_valid_neighbours(grid: &Grid<usize>, p: &Point) -> Vec<Point> {
     const DIRECTIONS: [(i32, i32); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
     DIRECTIONS
