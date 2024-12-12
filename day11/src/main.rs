@@ -1,4 +1,5 @@
 use cached::proc_macro::cached;
+use num_traits::Euclid;
 use std::collections::HashMap;
 
 fn main() {
@@ -31,21 +32,21 @@ fn blink(count: usize, mut stone_counts: HashMap<usize, usize>) -> usize {
 }
 
 #[cached]
-fn split(input: usize) -> [usize; 2] {
-    let s = input.to_string();
-    [
-        s[0..s.len() / 2].parse().expect("valid"),
-        s[s.len() / 2..s.len()].parse().expect("valid"),
-    ]
+fn len(number: usize) -> u32 {
+    number.checked_ilog10().unwrap_or(0) + 1
 }
 
 #[cached]
 fn step(input: usize) -> Vec<usize> {
     let mut result = Vec::with_capacity(2);
-    let s_len = (input as f64).log10().floor() as usize + 1_usize;
+    let num_digits = len(input);
     match input {
         0 => result.push(1),
-        x if s_len % 2 == 0 => result.extend_from_slice(&split(x)),
+        x if num_digits % 2 == 0 => {
+            let (left, right) = x.div_rem_euclid(&10usize.pow(num_digits / 2));
+            result.push(left);
+            result.push(right);
+        }
         x => result.push(x * 2024),
     }
     result
