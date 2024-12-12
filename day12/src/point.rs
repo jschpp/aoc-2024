@@ -50,6 +50,15 @@ impl From<&Point> for (usize, usize) {
     }
 }
 
+pub fn checked_idx<T: Copy>(p: Point, g: &Grid<T>) -> Option<T> {
+    let (line, col) = p.into();
+    if line >= g.rows() || col >= g.cols() {
+        None
+    } else {
+        Some(g[p])
+    }
+}
+
 impl Add<(i32, i32)> for Point {
     type Output = Option<Point>;
 

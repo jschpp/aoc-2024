@@ -7,7 +7,7 @@ use std::{
 #[macro_use]
 extern crate impl_ops;
 mod point;
-use point::{get_cardinal_neighbours, Point};
+use point::{checked_idx, get_cardinal_neighbours, Point};
 
 fn main() {
     let input = include_str!("../input.txt");
@@ -140,15 +140,6 @@ impl Region {
             }
         }
         corners * self.get_area()
-    }
-}
-
-fn checked_idx<T: Copy>(p: Point, g: &Grid<T>) -> Option<T> {
-    let (line, col) = p.into();
-    if line >= g.rows() || col >= g.cols() {
-        None
-    } else {
-        Some(g[p])
     }
 }
 
