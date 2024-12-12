@@ -185,6 +185,9 @@ dependencies = [
 name = "day06"
 version = "0.1.0"
 dependencies = [
+ "aoc",
+ "itertools",
+ "nom",
  "rayon",
 ]
 

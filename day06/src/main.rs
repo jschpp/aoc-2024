@@ -1,137 +1,100 @@
+use aoc::{Grid, Point};
+use itertools::Itertools;
+use nom::character::is_newline;
 use rayon::prelude::*;
 use std::{
     collections::HashSet,
-    fmt::Display,
-    iter::Sum,
-    ops::{Add, Index, IndexMut},
+    fmt::{Debug, Display},
 };
 
-#[derive(Debug, Default, Clone)]
-struct Grid {
-    data: Vec<Vec<Place>>,
-    start: Position,
-    found_loop: bool,
-}
-
-impl Grid {
-    fn walk_guard(&mut self) {
-        let mut direction: Position = Position(-1, 0);
-        let mut current_position = self.start;
-        let mut path: HashSet<(Position, Position)> = HashSet::new();
-        'outer: loop {
-            self[current_position] = Place::Visited;
-            let cache = (current_position, direction);
-            if path.contains(&cache) {
-                // println!("found loop");
-                self.found_loop = true;
-                break;
-            }
-            path.insert(cache);
-            'inner: loop {
-                let next_option = current_position + direction;
-                if next_option.0 < 0
-                    || next_option.0 >= self.data.len() as isize
-                    || next_option.1 < 0
-                    || next_option.1 >= self.data[0].len() as isize
-                {
-                    break 'outer;
-                }
-                match &self[next_option] {
-                    Place::Obstacle => direction = direction.rotate_90(),
-                    _ => {
-                        current_position = next_option;
-                        break 'inner;
-                    }
-                }
-            }
-        }
-    }
-
-    fn count(&self) -> PlaceCount {
-        self.data
-            .iter()
-            .flat_map(|line| {
-                line.iter().map(|place| match place {
-                    Place::Empty => PlaceCount {
-                        empty: 1,
-                        visited: 0,
-                        obstacles: 0,
-                    },
-                    Place::Visited => PlaceCount {
-                        empty: 0,
-                        visited: 1,
-                        obstacles: 0,
-                    },
-                    Place::Obstacle => PlaceCount {
-                        empty: 0,
-                        visited: 0,
-                        obstacles: 1,
-                    },
-                })
-            })
-            .sum()
-    }
-
-    fn place_obstacle(&self, pos: Position) -> Self {
-        let mut out = self.clone();
-        out[pos] = Place::Obstacle;
-        out
-    }
-}
-
-#[derive(Debug, Default)]
-struct PlaceCount {
-    empty: usize,
-    visited: usize,
-    obstacles: usize,
-}
-
-impl Add<PlaceCount> for PlaceCount {
-    type Output = Self;
-
-    fn add(self, rhs: PlaceCount) -> Self::Output {
-        PlaceCount {
-            empty: self.empty + rhs.empty,
-            visited: self.visited + rhs.visited,
-            obstacles: self.obstacles + rhs.obstacles,
-        }
-    }
-}
-
-impl Sum for PlaceCount {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(PlaceCount::default(), |acc, place| acc + place)
-    }
-}
-
-impl Display for Grid {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for line in &self.data {
-            for place in line {
-                write!(f, "{}", place)?;
-            }
-            writeln!(f)?;
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-struct Position(isize, isize);
+struct Direction(i32, i32);
 
-impl Position {
+impl Direction {
     fn rotate_90(&self) -> Self {
         // (x, y) rotated 90 degrees clockwise around (0, 0) is (y, -x)
         Self(self.1, -self.0)
     }
+
+    fn i32_tuple(&self) -> (i32, i32) {
+        self.into()
+    }
 }
 
-impl Add<Position> for Position {
-    type Output = Position;
+impl From<Direction> for (i32, i32) {
+    fn from(value: Direction) -> Self {
+        (value.0, value.1)
+    }
+}
 
-    // Required method
-    fn add(self, rhs: Position) -> Self::Output {
-        Position(self.0 + rhs.0, self.1 + rhs.1)
+impl From<&Direction> for (i32, i32) {
+    fn from(value: &Direction) -> Self {
+        (value.0, value.1)
+    }
+}
+
+struct Path {
+    data: Vec<Point>,
+    found_loop: bool,
+}
+
+fn walk_guard(start: Point, grid: &Grid<Place>) -> Path {
+    let mut direction: Direction = Direction(-1, 0);
+    let mut current_position = start;
+    let mut path: HashSet<(Point, Direction)> = HashSet::new();
+    let mut found_loop = false;
+    'outer: loop {
+        let cache = (current_position, direction);
+        if path.contains(&cache) {
+            found_loop = true;
+            break;
+        }
+        path.insert(cache);
+        'inner: loop {
+            let next_option: Option<Point> = current_position + direction.i32_tuple();
+            if let Some(next) = next_option {
+                if next.0 >= grid.rows() || next.1 >= grid.cols() {
+                    break 'outer;
+                }
+                match grid[next] {
+                    Place::Obstacle => direction = direction.rotate_90(),
+                    _ => {
+                        current_position = next;
+                        break 'inner;
+                    }
+                }
+            } else {
+                break 'outer;
+            }
+        }
+    }
+    let path = path.into_iter().map(|(point, _)| point).unique().collect();
+    Path {
+        data: path,
+        found_loop,
+    }
+}
+
+fn place_obstacle(grid: &Grid<Place>, pos: Point) -> Grid<Place> {
+    let mut out = grid.clone();
+    out[pos] = Place::Obstacle;
+    out
+}
+
+#[allow(unused)]
+fn visit_all(grid: &mut Grid<Place>, path: &[Point]) {
+    for point in path {
+        grid[point] = Place::Visited
+    }
+}
+
+#[allow(unused)]
+fn print_grid(grid: &Grid<Place>) {
+    for line in grid.iter_rows() {
+        for place in line {
+            print!("{}", place);
+        }
+        println!();
     }
 }
 
@@ -140,14 +103,16 @@ enum Place {
     Empty,
     Visited,
     Obstacle,
+    Start,
 }
 
 impl Display for Place {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Place::Empty => write!(f, " "),
+            Place::Empty => write!(f, "."),
             Place::Visited => write!(f, "X"),
             Place::Obstacle => write!(f, "#"),
+            Place::Start => write!(f, "^"),
         }
     }
 }
@@ -162,69 +127,56 @@ impl From<char> for Place {
     fn from(value: char) -> Self {
         match value {
             '#' => Self::Obstacle,
+            '^' => Self::Start,
             _ => Self::Empty,
         }
     }
 }
 
-impl Index<Position> for Grid {
-    type Output = Place;
-
-    fn index(&self, index: Position) -> &Self::Output {
-        &self.data[index.0 as usize][index.1 as usize]
-    }
-}
-
-impl IndexMut<Position> for Grid {
-    fn index_mut(&mut self, index: Position) -> &mut Self::Output {
-        &mut self.data[index.0 as usize][index.1 as usize]
-    }
-}
-
 fn main() {
     let input = include_str!("../input.txt");
-    let mut g: Vec<Vec<Place>> = Vec::default();
-    let mut start: Position = Position::default();
-    for (line_idx, line) in input.lines().enumerate() {
-        g.push(Vec::default());
-        for (char_idx, c) in line.chars().enumerate() {
-            if c == '^' {
-                start = Position(line_idx as isize, char_idx as isize);
-            }
-            g[line_idx].push(c.into());
-        }
-    }
-    let grid = Grid {
-        data: g,
-        start,
-        found_loop: false,
-    };
-    let mut initial_grid = grid.clone();
-    initial_grid.walk_guard();
-    println!("part1: {}", initial_grid.count().visited);
 
-    let loop_count: usize = initial_grid
-        .data
-        .iter()
-        .enumerate()
-        .flat_map(|(line_idx, line)| {
-            line.iter()
-                .enumerate()
-                .filter(|(_, p)| **p == Place::Visited)
-                .map(move |(pos, _)| Position(line_idx as isize, pos as isize))
-        })
-        .collect::<Vec<_>>()
-        .par_iter()
-        .flat_map(|pos| {
-            let mut grid = grid.clone().place_obstacle(*pos);
-            grid.walk_guard();
-            if grid.found_loop {
+    let (start, g) = parse_map(input);
+    let path = walk_guard(start, &g);
+
+    println!("part1: {}", path.data.len());
+
+    let loop_count: usize = path.data[1..path.data.len()]
+        .into_par_iter()
+        .flat_map(|point| {
+            let new_grid = place_obstacle(&g, *point);
+            let path = walk_guard(start, &new_grid);
+            if path.found_loop {
                 Some(())
             } else {
                 None
             }
         })
         .count();
-
     println!("part2: {loop_count}");
+}
+
+fn parse_map(input: &str) -> (Point, Grid<Place>) {
+    let width = input
+        .lines()
+        .next()
+        .expect("there should be at least one row")
+        .chars()
+        .count();
+    let data = input
+        .chars()
+        .filter(|c| !is_newline(*c as u8))
+        .map(|c| c.into())
+        .collect::<Vec<Place>>();
+
+    let mut grid = Grid::from_vec(data, width);
+
+    let ((line, col), _) = grid
+        .indexed_iter()
+        .find(|(_, place)| **place == Place::Start)
+        .expect("start should exist");
+    let start = Point(line, col);
+    grid[start] = Place::Empty;
+
+    (start, grid)
 }

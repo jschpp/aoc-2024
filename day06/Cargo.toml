@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 rayon = "1.10.0"
+aoc = {path = "../aoc"}
+itertools = {workspace = true}
+nom = {workspace = true}
