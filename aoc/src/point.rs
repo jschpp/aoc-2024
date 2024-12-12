@@ -147,25 +147,3 @@ pub fn get_cardinal_neighbours<T>(grid: &Grid<T>, p: &Point) -> Vec<Point> {
         .filter(|p| grid.rows() > p.0 && grid.cols() > p.1)
         .collect()
 }
-
-// /// get all neighbours for a given position in the grid
-// ///
-// /// checks wether the neighbours are in the grid or not
-// /// Will return an empty vector if there are no neighbours
-// pub fn get_neighbours<T>(grid: &Grid<T>, p: &Point) -> Vec<Point> {
-//     const DIRECTIONS: [(i32, i32); 8] = [
-//         (-1, 0),
-//         (1, 0),
-//         (0, -1),
-//         (0, 1),
-//         (-1, -1),
-//         (1, 1),
-//         (1, -1),
-//         (-1, 1),
-//     ];
-//     DIRECTIONS
-//         .iter()
-//         .flat_map(|dir| p + *dir)
-//         .filter(|p| grid.rows() > p.0 && grid.cols() > p.1)
-//         .collect()
-// }

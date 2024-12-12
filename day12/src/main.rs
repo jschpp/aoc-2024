@@ -1,13 +1,9 @@
-use grid::Grid;
+use aoc::{checked_idx, get_cardinal_neighbours, Grid, Point};
 use itertools::Itertools;
 use std::{
     collections::HashSet,
     sync::{Arc, RwLock},
 };
-#[macro_use]
-extern crate impl_ops;
-mod point;
-use point::{checked_idx, get_cardinal_neighbours, Point};
 
 fn main() {
     let input = include_str!("../input.txt");
