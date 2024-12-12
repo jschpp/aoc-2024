@@ -207,9 +207,7 @@ dependencies = [
 name = "day10"
 version = "0.1.0"
 dependencies = [
- "grid",
- "impl_ops",
- "itertools",
+ "aoc",
 ]
 
 [[package]]

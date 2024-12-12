@@ -1,9 +1,5 @@
+use aoc::{get_cardinal_neighbours, Grid, Point};
 use std::collections::HashSet;
-#[macro_use]
-extern crate impl_ops;
-use grid::Grid;
-mod point;
-use point::Point;
 
 fn main() {
     let input = include_str!("../input.txt");
@@ -57,7 +53,7 @@ fn travel(chain: Vec<Point>, grid: &Grid<usize>) -> Vec<Vec<Point>> {
         return vec![chain];
     }
     let next = &chain[chain.len() - 1];
-    let n: Vec<Point> = get_valid_neighbours(grid, next)
+    let n: Vec<Point> = get_cardinal_neighbours(grid, next)
         .into_iter()
         .filter(|p| grid[p] - grid[next] == 1)
         .collect();
@@ -73,18 +69,5 @@ fn travel(chain: Vec<Point>, grid: &Grid<usize>) -> Vec<Vec<Point>> {
                 .filter(|x| x.len() == 10)
                 .collect::<Vec<_>>()
         })
-        .collect()
-}
-
-/// get the valid cardinal neighbour for a given position in the grid
-///
-/// checks wether the neighbours are in the grid or not
-/// Will return an empty vector if there are no neighbours
-fn get_valid_neighbours(grid: &Grid<usize>, p: &Point) -> Vec<Point> {
-    const DIRECTIONS: [(i32, i32); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
-    DIRECTIONS
-        .iter()
-        .flat_map(|dir| p + *dir)
-        .filter(|p| grid.rows() > p.0 && grid.cols() > p.1)
         .collect()
 }
