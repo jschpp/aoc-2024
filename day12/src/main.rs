@@ -12,21 +12,14 @@ use point::{get_cardinal_neighbours, Point};
 fn main() {
     let input = include_str!("../input.txt");
     let g: Grid<char> = parse(input);
-    let grid_arc = Arc::new(g);
 
     // find all regions
-    let region = find_region(grid_arc.clone());
+    let region = find_region(&g);
 
-    let value: usize = region
-        .iter()
-        .map(|r| r.get_value_part1(grid_arc.clone()))
-        .sum();
+    let value: usize = region.iter().map(|r| r.get_value_part1(&g)).sum();
     println!("part1 {value}");
 
-    let value: usize = region
-        .iter()
-        .map(|r| r.get_value_part2(grid_arc.clone()))
-        .sum();
+    let value: usize = region.iter().map(|r| r.get_value_part2(&g)).sum();
     println!("part2 {value}");
 }
 
@@ -59,10 +52,10 @@ impl Region {
         self.data.len()
     }
 
-    fn get_fence_length(&self, g: Arc<Grid<char>>) -> usize {
+    fn get_fence_length(&self, g: &Grid<char>) -> usize {
         let mut result = 0_usize;
         for point in self.data.iter() {
-            let count = get_cardinal_neighbours(&g, point)
+            let count = get_cardinal_neighbours(g, point)
                 .iter()
                 .filter(|x| self.data.contains(x))
                 .count();
@@ -71,27 +64,27 @@ impl Region {
         result
     }
 
-    fn get_value_part1(&self, g: Arc<Grid<char>>) -> usize {
+    fn get_value_part1(&self, g: &Grid<char>) -> usize {
         self.get_area() * self.get_fence_length(g)
     }
 
-    fn get_letter(&self, g: Arc<Grid<char>>) -> char {
+    fn get_letter(&self, g: &Grid<char>) -> char {
         let point = self.data.iter().next().expect("not empty");
         g[point]
     }
 
-    fn get_value_part2(&self, g: Arc<Grid<char>>) -> usize {
-        let own_letter = Some(self.get_letter(g.clone()));
+    fn get_value_part2(&self, g: &Grid<char>) -> usize {
+        let own_letter = Some(self.get_letter(g));
         let mut corners = 0_usize;
         for p in self.data.iter() {
-            let n = (p + (-1, 0)).and_then(|p| checked_idx(p, &g.clone()));
-            let s = (p + (1, 0)).and_then(|p| checked_idx(p, &g.clone()));
-            let w = (p + (0, -1)).and_then(|p| checked_idx(p, &g.clone()));
-            let e = (p + (0, 1)).and_then(|p| checked_idx(p, &g.clone()));
-            let ne = (p + (-1, 1)).and_then(|p| checked_idx(p, &g.clone()));
-            let nw = (p + (-1, -1)).and_then(|p| checked_idx(p, &g.clone()));
-            let se = (p + (1, 1)).and_then(|p| checked_idx(p, &g.clone()));
-            let sw = (p + (1, -1)).and_then(|p| checked_idx(p, &g.clone()));
+            let n = (p + (-1, 0)).and_then(|p| checked_idx(p, g));
+            let s = (p + (1, 0)).and_then(|p| checked_idx(p, g));
+            let w = (p + (0, -1)).and_then(|p| checked_idx(p, g));
+            let e = (p + (0, 1)).and_then(|p| checked_idx(p, g));
+            let ne = (p + (-1, 1)).and_then(|p| checked_idx(p, g));
+            let nw = (p + (-1, -1)).and_then(|p| checked_idx(p, g));
+            let se = (p + (1, 1)).and_then(|p| checked_idx(p, g));
+            let sw = (p + (1, -1)).and_then(|p| checked_idx(p, g));
 
             // convex corners
             // checking for None here to keep the _literal_ edge cases at bay^^
@@ -166,7 +159,7 @@ impl From<HashSet<Point>> for Region {
     }
 }
 
-fn find_region(grid: Arc<Grid<char>>) -> Vec<Region> {
+fn find_region(grid: &Grid<char>) -> Vec<Region> {
     let mut seen_points: HashSet<Point> = HashSet::default();
     let mut found_regions: Vec<Region> = Vec::default();
     for point in (0..grid.rows())
@@ -179,7 +172,7 @@ fn find_region(grid: Arc<Grid<char>>) -> Vec<Region> {
         }
 
         let new_region: Arc<RwLock<HashSet<Point>>> = Arc::new(RwLock::new(HashSet::default()));
-        flood_fill_region(new_region.clone(), point, grid.clone());
+        flood_fill_region(new_region.clone(), point, grid);
 
         // putting all found points in seen
         let points = new_region.read().unwrap().clone();
@@ -192,16 +185,12 @@ fn find_region(grid: Arc<Grid<char>>) -> Vec<Region> {
     found_regions
 }
 
-fn flood_fill_region(
-    current_region: Arc<RwLock<HashSet<Point>>>,
-    next: Point,
-    grid: Arc<Grid<char>>,
-) {
+fn flood_fill_region(current_region: Arc<RwLock<HashSet<Point>>>, next: Point, grid: &Grid<char>) {
     current_region.write().expect("not poisoned").insert(next);
-    get_cardinal_neighbours(&grid, &next)
+    get_cardinal_neighbours(grid, &next)
         .into_iter()
         .filter(|coord| {
             grid[*coord] == grid[next] && !current_region.read().expect("read").contains(coord)
         })
-        .for_each(|p| flood_fill_region(current_region.clone(), p, grid.clone()));
+        .for_each(|p| flood_fill_region(current_region.clone(), p, grid));
 }

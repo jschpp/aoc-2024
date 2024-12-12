@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-cached = "0.54.0"
-glam = "0.29.2"
 grid = "0.15.0"
 impl_ops = "0.1.1"
 itertools = "0.13.0"
-uuid = { version = "1.11.0", features = ["v4"] }
