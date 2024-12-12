@@ -1,5 +1,5 @@
 use grid::Grid;
-use std::ops::{self, Add, Index, Sub};
+use std::ops::{self, Add, Index, IndexMut, Sub};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Point(pub usize, pub usize);
@@ -41,6 +41,18 @@ impl<T> Index<&Point> for Grid<T> {
 
     fn index(&self, index: &Point) -> &Self::Output {
         &self[*index]
+    }
+}
+
+impl<T> IndexMut<Point> for Grid<T> {
+    fn index_mut(&mut self, index: Point) -> &mut Self::Output {
+        &mut self[(index.0, index.1)]
+    }
+}
+
+impl<T> IndexMut<&Point> for Grid<T> {
+    fn index_mut(&mut self, index: &Point) -> &mut Self::Output {
+        &mut self[*index]
     }
 }
 
