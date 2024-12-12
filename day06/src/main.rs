@@ -208,7 +208,6 @@ fn main() {
         .iter()
         .enumerate()
         .flat_map(|(line_idx, line)| {
-            let line_idx = line_idx;
             line.iter()
                 .enumerate()
                 .filter(|(_, p)| **p == Place::Visited)
