@@ -87,25 +87,24 @@ impl Region {
             let sw = (p + (1, -1)).and_then(|p| checked_idx(p, g));
 
             // convex corners
-            // checking for None here to keep the _literal_ edge cases at bay^^
 
             // upper left corner
-            if (n.is_none() && w.is_none()) || (n != own_letter && w != own_letter) {
+            if n != own_letter && w != own_letter {
                 corners += 1;
             }
 
             // lower left corner
-            if (s.is_none() && w.is_none()) || (s != own_letter && w != own_letter) {
+            if s != own_letter && w != own_letter {
                 corners += 1;
             }
 
             // lower right corner
-            if (s.is_none() && e.is_none()) || (s != own_letter && e != own_letter) {
+            if s != own_letter && e != own_letter {
                 corners += 1;
             }
 
             // upper right corner
-            if (n.is_none() && e.is_none()) || (n != own_letter && e != own_letter) {
+            if n != own_letter && e != own_letter {
                 corners += 1;
             }
 
