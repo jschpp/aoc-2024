@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 grid = "0.15.0"
-impl_ops = "0.1.1"
+impl_ops = {workspace = true}
