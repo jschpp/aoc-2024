@@ -5,7 +5,7 @@ use nom::{
     combinator::opt,
     multi::separated_list1,
     sequence::{preceded, separated_pair, terminated},
-    IResult,
+    IResult, Parser,
 };
 
 fn main() {
@@ -48,7 +48,7 @@ impl Machine {
 
     fn part2(&self) -> usize {
         let (a, b) = self.solve(10000000000000);
-        if a.floor() == a && b.floor() == b {
+        if a.trunc() == a && b.trunc() == b {
             a as usize * 3 + b as usize
         } else {
             0_usize
@@ -57,14 +57,14 @@ impl Machine {
 }
 
 fn parse_value(input: &str) -> IResult<&str, f64> {
-    preceded(take(2_usize), complete::i32)(input).map(|(input, val)| (input, val as f64))
+    preceded(take(2_usize), complete::i32.map(|x| x as f64))(input)
 }
 
 fn parse_line(input: &str) -> IResult<&str, DVec2> {
     let (input, _name) = terminated(take_until1(": "), tag(": "))(input)?;
-    let (input, a) = separated_pair(parse_value, tag(", "), parse_value)(input)?;
+    let (input, x) = separated_pair(parse_value, tag(", "), parse_value)(input)?;
     let (input, _) = opt(newline)(input)?;
-    Ok((input, dvec2(a.0, a.1)))
+    Ok((input, x.into()))
 }
 
 fn parse_machine(input: &str) -> IResult<&str, Machine> {
