@@ -1,4 +1,6 @@
-use glam::{dvec2, DVec2};
+use std::ops::Sub;
+
+use glam::DVec2;
 use nom::{
     bytes::complete::{tag, take, take_until1},
     character::complete::{self, newline},
@@ -37,21 +39,32 @@ impl Machine {
         (n1, n2)
     }
 
-    fn part1(&self) -> usize {
-        let (a, b) = self.solve(0);
-        if a.floor() == a && b.floor() == b {
-            a as usize * 3 + b as usize
+    fn int_solve(&self, delta: u64) -> Option<(usize, usize)> {
+        let (a, b) = self.solve(delta);
+        if a.floor().sub(a) <= f64::EPSILON
+            && a.sub(a.floor()) <= f64::EPSILON
+            && b.floor().sub(b) <= f64::EPSILON
+            && b.sub(b.floor()) <= f64::EPSILON
+        {
+            Some((a as usize, b as usize))
         } else {
-            0_usize
+            None
+        }
+    }
+
+    fn part1(&self) -> usize {
+        if let Some((a, b)) = self.int_solve(0) {
+            3 * a + b
+        } else {
+            0
         }
     }
 
     fn part2(&self) -> usize {
-        let (a, b) = self.solve(10000000000000);
-        if a.trunc() == a && b.trunc() == b {
-            a as usize * 3 + b as usize
+        if let Some((a, b)) = self.int_solve(10000000000000) {
+            3 * a + b
         } else {
-            0_usize
+            0
         }
     }
 }
@@ -82,6 +95,7 @@ fn parse(input: &str) -> IResult<&str, Vec<Machine>> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use glam::dvec2;
     use rstest::*;
 
     #[rstest]
