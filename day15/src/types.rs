@@ -74,3 +74,25 @@ impl From<Direction> for (i32, i32) {
         }
     }
 }
+
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub enum BiggerCell {
+    Wall,
+    CrateLeft,
+    CrateRight,
+    #[default]
+    Empty,
+    Robot,
+}
+
+impl Debug for BiggerCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BiggerCell::Wall => write!(f, "#"),
+            BiggerCell::CrateLeft => write!(f, "["),
+            BiggerCell::CrateRight => write!(f, "]"),
+            BiggerCell::Empty => write!(f, "."),
+            BiggerCell::Robot => write!(f, "@"),
+        }
+    }
+}
