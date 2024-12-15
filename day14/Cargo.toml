@@ -1,0 +1,10 @@
+[package]
+name = "day14"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cached = "0.54.0"
+glam = "0.29.2"
+nom = {workspace = true}
+rayon = "1.10.0"
