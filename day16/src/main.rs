@@ -6,26 +6,35 @@ use std::{collections::HashSet, fmt::Debug};
 fn main() {
     let input = include_str!("../input.txt");
     let maze = parse(input);
+
+    // Part1 use dijkstra to find shortest path
+    // every step will yield a Point as well as an IVec2 describing the direction
+    // the reindeer is currently facing
     let (path, p1_cost) = dijkstra::dijkstra(
         &(maze.start, IVec2::X),
         |(p, dir)| successors((*p, *dir), &maze.grid),
-        |(p, dir)| *p == maze.end,
+        |(p, _)| *p == maze.end,
     )
     .unwrap();
     println!("part1 {p1_cost}");
 
-    // part2
+    // Part2
+    // Using A* to find _all_ shortest paths in the maze.
+    // As 'heuristic' we can simply use the cost generated in part1 + 1
     let (astar_paths, p2_cost) = astar::astar_bag(
         &(maze.start, IVec2::X),
         |(p, dir)| successors((*p, *dir), &maze.grid),
         |_| path.len() + 1,
-        |(p, dir)| *p == maze.end,
+        |(p, _)| *p == maze.end,
     )
     .unwrap();
+
     assert_eq!(p1_cost, p2_cost);
+
+    // Check wich nodes were along at least one shortest path
     let mut seen: HashSet<Point> = HashSet::new();
     for path in astar_paths {
-        path.into_iter().for_each(|(p, _dir)| {
+        path.into_iter().for_each(|(p, _)| {
             seen.insert(p);
         })
     }
@@ -84,32 +93,28 @@ fn successors((current, dir): (Point, IVec2), grid: &Grid<Cell>) -> Vec<((Point,
 fn parse(input: &str) -> Maze {
     let mut start: Point = Point(0, 0);
     let mut end: Point = Point(0, 0);
-    let vecs = input
-        .lines()
-        .enumerate()
-        .map(|(line_idx, line)| {
-            line.chars()
-                .enumerate()
-                .flat_map(|(col_idx, col)| match col {
-                    '.' => Some(Cell::Empty),
-                    '#' => Some(Cell::Wall),
-                    'S' => {
-                        start = Point(line_idx, col_idx);
-                        Some(Cell::Empty)
-                    }
-                    'E' => {
-                        end = Point(line_idx, col_idx);
-                        Some(Cell::Empty)
-                    }
-                    val => panic!("encountered {val}"),
-                })
-                .collect()
-        })
-        .collect::<Vec<Vec<Cell>>>();
-    let cols = vecs[0].len();
+    let mut vecs: Vec<Cell> = Vec::with_capacity(input.len());
+    let mut cols = 0;
+    for (line_idx, line) in input.lines().enumerate() {
+        for (col_idx, col) in line.chars().enumerate() {
+            if col == '#' {
+                vecs.push(Cell::Wall)
+            } else {
+                vecs.push(Cell::Empty);
+                if col == 'S' {
+                    start = Point(line_idx, col_idx);
+                }
+                if col == 'E' {
+                    end = Point(line_idx, col_idx);
+                }
+            }
+            cols = cols.max(col_idx + 1);
+        }
+    }
+
     Maze {
         start,
         end,
-        grid: Grid::from_vec(vecs.into_iter().flatten().collect(), cols),
+        grid: Grid::from_vec(vecs, cols),
     }
 }
