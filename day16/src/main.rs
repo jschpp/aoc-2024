@@ -10,7 +10,7 @@ fn main() {
     // Part1 use dijkstra to find shortest path
     // every step will yield a Point as well as an IVec2 describing the direction
     // the reindeer is currently facing
-    let (path, p1_cost) = dijkstra::dijkstra(
+    let (_path, p1_cost) = dijkstra::dijkstra(
         &(maze.start, IVec2::X),
         |(p, dir)| successors((*p, *dir), &maze.grid),
         |(p, _)| *p == maze.end,
@@ -20,11 +20,10 @@ fn main() {
 
     // Part2
     // Using A* to find _all_ shortest paths in the maze.
-    // As 'heuristic' we can simply use the cost generated in part1 + 1
     let (astar_paths, p2_cost) = astar::astar_bag(
         &(maze.start, IVec2::X),
         |(p, dir)| successors((*p, *dir), &maze.grid),
-        |_| path.len() + 1,
+        |(p, _)| heuristic(p, &maze.end),
         |(p, _)| *p == maze.end,
     )
     .unwrap();
@@ -39,6 +38,10 @@ fn main() {
         })
     }
     println!("part1 {}", seen.len())
+}
+
+fn heuristic(a: &Point, goal: &Point) -> usize {
+    a.0.abs_diff(goal.0) + a.1.abs_diff(goal.1)
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
