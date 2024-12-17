@@ -10,9 +10,9 @@ use nom::{
 fn main() {
     let input = include_str!("../input.txt");
     let (_input, prog) = parse(input).unwrap();
+
     let part1 = prog.clone().run();
-    let part1 = result_to_string(&part1);
-    println!("part1: {part1}");
+    println!("part1: {}", result_to_string(&part1));
 
     let part2 = part2(&mut prog.clone());
     println!("part2: {part2}");
@@ -100,6 +100,7 @@ impl Program {
         result
     }
 
+    #[inline(always)]
     fn decode_combo(&self, combo_operand: u64) -> u64 {
         match combo_operand {
             0..=3 => combo_operand,
@@ -110,6 +111,7 @@ impl Program {
         }
     }
 }
+
 fn result_to_string(result: &[u64]) -> String {
     result
         .iter()
@@ -124,8 +126,7 @@ fn part2(prog: &mut Program) -> u64 {
     let mut digits_found: usize = 1;
     loop {
         // get result via decompiled formula
-        // this is faster then running the program
-        // disabled since not needed after all
+        // this is faster then running the program itself
         // difference between this and running the program:
         //
         // Decompilation of my program
@@ -147,23 +148,26 @@ fn part2(prog: &mut Program) -> u64 {
         // user    0m0,101s
         // sys     0m0,017s
         //
-        // let result = (0..digits_found)
-        //     .map(|x| {
-        //         let a = a >> (3 * x);
-        //         let b = (a & 7) ^ 3;
-        //         let c = a >> ((a & 7) ^ 5);
-        //         (b ^ c) & 7
-        //     })
-        //     .collect::<Vec<_>>();
+        let result = (0..digits_found)
+            .map(|x| {
+                let a = a >> (3 * x);
+                let b = (a & 7) ^ 3;
+                let c = a >> ((a & 7) ^ 5);
+                (b ^ c) & 7
+            })
+            .collect::<Vec<_>>();
 
-        prog.reg.a = a;
-        let result = prog.run();
+        // disabled since its slower
+        // prog.reg.a = a;
+        // let result = prog.run();
 
         // compare the last digits_found digits of the result with the last digits of the code
         if result == code[code.len() - digits_found..code.len()] {
-            if result == code {
+            if result.len() == code.len() {
+                // both slices match along the complete len
                 break;
             }
+
             // since the decompiled code tells us that a is divided by 8 every run the next digit will be found above a * 8
             a <<= 3;
             digits_found += 1;
