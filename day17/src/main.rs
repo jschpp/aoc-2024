@@ -14,8 +14,12 @@ fn main() {
     let part1 = prog.clone().run();
     println!("part1: {}", result_to_string(&part1));
 
-    let part2 = part2(&mut prog.clone());
+    let part2 = part2(&prog);
     println!("part2: {part2}");
+
+    // this is slow so it's not enabled per default
+    // let part2 = part2_emulator(&mut prog.clone());
+    // println!("part2 with emulator: {part2}");
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -120,8 +124,8 @@ fn result_to_string(result: &[u64]) -> String {
         .join(",")
 }
 
-fn part2(prog: &mut Program) -> u64 {
-    let code = prog.code.clone();
+fn part2(prog: &Program) -> u64 {
+    let code_len = prog.code.len();
     let mut a: u64 = 0;
     let mut digits_found: usize = 1;
     loop {
@@ -157,13 +161,35 @@ fn part2(prog: &mut Program) -> u64 {
             })
             .collect::<Vec<_>>();
 
-        // disabled since its slower
-        // prog.reg.a = a;
-        // let result = prog.run();
+        // compare the last digits_found digits of the result with the last digits of the code
+        if result == prog.code[code_len - digits_found..code_len] {
+            if digits_found == code_len {
+                // both slices match along the complete len
+                break;
+            }
+
+            // since the decompiled code tells us that a is divided by 8 every run the next digit will be found above a * 8
+            a <<= 3;
+            digits_found += 1;
+        } else {
+            a += 1;
+        }
+    }
+    a
+}
+
+#[allow(dead_code)]
+fn part2_emulator(prog: &mut Program) -> u64 {
+    let code = prog.code.clone();
+    let mut a: u64 = 0;
+    let mut digits_found: usize = 1;
+    loop {
+        prog.reg.a = a;
+        let result = prog.run();
 
         // compare the last digits_found digits of the result with the last digits of the code
         if result == code[code.len() - digits_found..code.len()] {
-            if result.len() == code.len() {
+            if digits_found == code.len() {
                 // both slices match along the complete len
                 break;
             }
