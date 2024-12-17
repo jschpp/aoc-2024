@@ -30,10 +30,10 @@ enum Instruction {
     Cdv,
 }
 
-impl TryFrom<i128> for Instruction {
+impl TryFrom<u64> for Instruction {
     type Error = String;
 
-    fn try_from(value: i128) -> Result<Self, Self::Error> {
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Instruction::Adv),
             1 => Ok(Instruction::Bxl),
@@ -50,33 +50,33 @@ impl TryFrom<i128> for Instruction {
 
 #[derive(Debug, Clone, Copy)]
 struct Register {
-    a: i128,
-    b: i128,
-    c: i128,
+    a: u64,
+    b: u64,
+    c: u64,
 }
 
 #[derive(Debug, Clone)]
 struct Program {
     reg: Register,
-    code: Vec<i128>,
+    code: Vec<u64>,
 }
 
 impl Program {
-    fn run(&mut self) -> Vec<i128> {
-        let mut result: Vec<i128> = Vec::default();
+    fn run(&mut self) -> Vec<u64> {
+        let mut result: Vec<u64> = Vec::default();
         let mut ip: usize = 0;
-        while ip < self.code.len() {
+        while ip + 1 < self.code.len() {
             let opcode: Instruction = self.code[ip].try_into().expect("valid opcode");
             let operand = self.code[ip + 1];
             match opcode {
                 Instruction::Adv => {
                     let rhs = self.decode_combo(operand);
-                    self.reg.a /= 1 << rhs;
+                    self.reg.a >>= rhs;
                 }
                 Instruction::Bxl => self.reg.b ^= operand,
                 Instruction::Bst => {
                     let rhs = self.decode_combo(operand);
-                    self.reg.b = rhs % 8;
+                    self.reg.b = rhs & 7;
                 }
                 Instruction::Jnz => {
                     if self.reg.a != 0 {
@@ -85,14 +85,14 @@ impl Program {
                     }
                 }
                 Instruction::Bxc => self.reg.b ^= self.reg.c,
-                Instruction::Out => result.push(self.decode_combo(operand) % 8),
+                Instruction::Out => result.push(self.decode_combo(operand) & 7),
                 Instruction::Bdv => {
                     let rhs = self.decode_combo(operand);
-                    self.reg.b = self.reg.a / (1 << rhs);
+                    self.reg.b = self.reg.a >> rhs;
                 }
                 Instruction::Cdv => {
                     let rhs = self.decode_combo(operand);
-                    self.reg.c = self.reg.a / (1 << rhs);
+                    self.reg.c = self.reg.a >> rhs;
                 }
             };
             ip += 2;
@@ -100,9 +100,8 @@ impl Program {
         result
     }
 
-    fn decode_combo(&self, combo_operand: i128) -> i128 {
+    fn decode_combo(&self, combo_operand: u64) -> u64 {
         match combo_operand {
-            i128::MIN..0 => unreachable!(),
             0..=3 => combo_operand,
             4 => self.reg.a,
             5 => self.reg.b,
@@ -111,7 +110,7 @@ impl Program {
         }
     }
 }
-fn result_to_string(result: &[i128]) -> String {
+fn result_to_string(result: &[u64]) -> String {
     result
         .iter()
         .map(|num| num.to_string())
@@ -119,18 +118,9 @@ fn result_to_string(result: &[i128]) -> String {
         .join(",")
 }
 
-fn part2(prog: &mut Program) -> i128 {
-    // Decompilation of my program
-    // 2,4   b = A % 8     => B = a % 8
-    // 1,5   B ^= 5        => B = (a % 8) ^ 5
-    // 7,5   C = A / 1<<B  => C = a / (1 << ((a % 8) ^ 5))
-    // 1,6   B ^= 6        => B = ((a % 8) ^ 5) ^ 6 => (a % 8) ^ 3
-    // 0,3   A /= 1<<3     => A = A >> 3
-    // 4,1   B ^= C        => B = ((a % 8) ^ 3) ^ (a / (1 << ((a % 8) ^ 5)))
-    // 5,5   OUT B % 8
-
+fn part2(prog: &mut Program) -> u64 {
     let code = prog.code.clone();
-    let mut a: i128 = 0;
+    let mut a: u64 = 0;
     let mut digits_found: usize = 1;
     loop {
         // get result via decompiled formula
@@ -138,35 +128,39 @@ fn part2(prog: &mut Program) -> i128 {
         // disabled since not needed after all
         // difference between this and running the program:
         //
-        // program:
-        // real    0m1,399s
-        // user    0m1,344s
-        // sys     0m0,023s
+        // Decompilation of my program
+        // 2,4   b = A % 8     => B = A % 8                    => A & 7 since A mod 8 == A & 7
+        // 1,5   B ^= 5        => B = (A % 8) ^ 5              => (A & 7) ^ 5
+        // 7,5   C = A / 1<<B  => C = A / (1 << ((A % 8) ^ 5)) => A >> ((A & 7) ^ 5)
+        // 1,6   B ^= 6        => B = ((A & 7) ^ 5) ^ 6        => (A & 7) ^ 3
+        // 0,3   A /= 1<<3     => A = A >> 3
+        // 4,1   B ^= C        => B = ((A & 7) ^ 3) ^ (A >> ((A & 7) ^ 5))
+        // 5,5   OUT B % 8
         //
-        // this:
-        // real    0m0,650s
-        // user    0m0,606s
+        // program:
+        // real    0m0,986s
+        // user    0m0,952s
         // sys     0m0,027s
         //
-        let result = (0..digits_found)
-            .map(|x| {
-                let a = a >> (3 * x);
-                (((a % 8) ^ 3) ^ (a / (1 << ((a % 8) ^ 5)))) % 8
-            })
-            .collect::<Vec<_>>();
+        // this:
+        // real    0m0,118s
+        // user    0m0,101s
+        // sys     0m0,017s
+        //
+        // let result = (0..digits_found)
+        //     .map(|x| {
+        //         let a = a >> (3 * x);
+        //         let b = (a & 7) ^ 3;
+        //         let c = a >> ((a & 7) ^ 5);
+        //         (b ^ c) & 7
+        //     })
+        //     .collect::<Vec<_>>();
 
-        // prog.reg.a = a;
-        // let result = prog.run();
+        prog.reg.a = a;
+        let result = prog.run();
 
         // compare the last digits_found digits of the result with the last digits of the code
         if result == code[code.len() - digits_found..code.len()] {
-            // enable for debug output
-            // println!(
-            //     "a:{a}, len:{digits_found}, result:{}, last_code:{}",
-            //     result_to_string(&result),
-            //     result_to_string(&code[code.len() - digits_found..code.len()])
-            // );
-
             if result == code {
                 break;
             }
@@ -181,14 +175,14 @@ fn part2(prog: &mut Program) -> i128 {
 }
 
 fn parse_registers(input: &str) -> IResult<&str, Register> {
-    let (input, a) = terminated(preceded(tag("Register A: "), complete::i128), line_ending)(input)?;
-    let (input, b) = terminated(preceded(tag("Register B: "), complete::i128), line_ending)(input)?;
-    let (input, c) = terminated(preceded(tag("Register C: "), complete::i128), line_ending)(input)?;
+    let (input, a) = terminated(preceded(tag("Register A: "), complete::u64), line_ending)(input)?;
+    let (input, b) = terminated(preceded(tag("Register B: "), complete::u64), line_ending)(input)?;
+    let (input, c) = terminated(preceded(tag("Register C: "), complete::u64), line_ending)(input)?;
     Ok((input, Register { a, b, c }))
 }
 
-fn parse_code(input: &str) -> IResult<&str, Vec<i128>> {
-    preceded(tag("Program: "), separated_list1(tag(","), complete::i128))(input)
+fn parse_code(input: &str) -> IResult<&str, Vec<u64>> {
+    preceded(tag("Program: "), separated_list1(tag(","), complete::u64))(input)
 }
 
 fn parse_program(input: &str) -> IResult<&str, Program> {
