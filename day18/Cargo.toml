@@ -4,7 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-nom = {workspace = true}
 aoc = {path = "../aoc"}
 pathfinding = "4.12.0"
-rayon = "1.10.0"
