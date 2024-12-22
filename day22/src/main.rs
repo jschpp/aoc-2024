@@ -1,11 +1,14 @@
-use std::iter::Iterator;
 use rayon::prelude::*;
+use std::iter::Iterator;
 
 fn main() {
     let input = include_str!("../input.txt");
-    let initial: Vec<Seed> = input.lines().map(|x| Seed(x.parse().unwrap())).collect();
+    let initial: Vec<Seed> = input
+        .lines()
+        .map(|x| Seed(x.trim().parse().unwrap()))
+        .collect();
     let part1_result: u64 = initial
-        .into_par_iter()
+        .par_iter()
         .map(|x| x.into_iter().nth(1999).unwrap().0)
         .sum();
     println!("part1 {part1_result}");
