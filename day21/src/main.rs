@@ -1,21 +1,21 @@
+use cached::proc_macro::cached;
 use itertools::Itertools;
 use pathfinding::prelude::*;
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, iter::zip};
 
 fn main() {
     let input = include_str!("../input.txt");
     let inputs: Vec<Vec<KeypadButton>> = input.lines().map(parse).collect();
 
     let part1_result: usize = inputs
-        .clone()
-        .into_iter()
-        .map(|input_s| get_num(&input_s) * part1(input_s)[0].len())
+        .iter()
+        .map(|key_sequence| solve(key_sequence, 2))
         .sum();
     println!("part1: {part1_result}");
 
     let part2_result: usize = inputs
-        .into_iter()
-        .map(|input_s| get_num(&input_s) * part2(input_s)[0].len())
+        .iter()
+        .map(|key_sequence| solve(key_sequence, 25))
         .sum();
     println!("part2: {part2_result}");
 }
@@ -45,29 +45,51 @@ fn get_num(s: &[KeypadButton]) -> usize {
     result
 }
 
-fn part1(inputs: Vec<KeypadButton>) -> Vec<Sequence> {
+fn solve(inputs: &[KeypadButton], count: usize) -> usize {
     let keypad_movements = precompute_keypad_movement();
+    let num = get_num(inputs);
     let first_bot = get_input_sequence(inputs, keypad_movements);
-    chain_bots(first_bot, 2)
-}
 
-fn part2(inputs: Vec<KeypadButton>) -> Vec<Sequence> {
-    let keypad_movements = precompute_keypad_movement();
-    let first_bot = get_input_sequence(inputs, keypad_movements);
-    // lol nope
-    chain_bots(first_bot, 25)
-}
-
-fn chain_bots(mut inputs: Vec<Sequence>, count: usize) -> Vec<Sequence> {
-    let directional_movements = precompute_directional_movement();
-    for x in 0..count {
-        println!("loop {x}");
-        inputs = inputs
-            .into_iter()
-            .flat_map(|s| convert_input_sequence(s, &directional_movements))
-            .min_set_by(|p1, p2| p1.len().cmp(&p2.len()));
+    let mut optiomal = usize::MAX;
+    for seq in first_bot {
+        let mut length = 0;
+        let mut tmp_seq = vec![DirectionalButton::Activate];
+        tmp_seq.extend(&seq.inner);
+        for (x, y) in zip(tmp_seq, seq.inner) {
+            length += compute_len(x, y, count);
+        }
+        optiomal = optiomal.min(length)
     }
-    inputs
+    num * optiomal
+}
+
+#[cached]
+fn compute_len(a: DirectionalButton, b: DirectionalButton, depth: usize) -> usize {
+    let dir_seqs = precompute_directional_movement();
+    if depth == 1 {
+        return dir_seqs.get(&(a, b)).expect("precomputed")[0].len();
+    }
+    let mut optimal: usize = usize::MAX;
+    for seq in dir_seqs.get(&(a, b)).unwrap() {
+        let mut length = 0;
+
+        let mut tmp_seq = vec![DirectionalButton::Activate];
+        tmp_seq.extend(seq);
+
+        for (x, y) in zip(tmp_seq, seq) {
+            length += compute_len(x, *y, depth - 1)
+        }
+        optimal = optimal.min(length)
+    }
+    optimal
+}
+
+#[allow(dead_code)]
+fn format_seq(seq: &[DirectionalButton]) -> String {
+    seq.iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn precompute_keypad_movement() -> HashMap<(KeypadButton, KeypadButton), Vec<Vec<DirectionalButton>>>
@@ -76,13 +98,8 @@ fn precompute_keypad_movement() -> HashMap<(KeypadButton, KeypadButton), Vec<Vec
         .into_iter()
         .cartesian_product(KEYPAD_BUTTONS)
         .map(|(a, b)| {
-            let (astar_paths, _) = astar_bag(
-                &a,
-                |button| keypad_neighbours(button),
-                |_| 0,
-                |cur| *cur == b,
-            )
-            .expect("some way must exist");
+            let (astar_paths, _) = astar_bag(&a, keypad_neighbours, |_| 0, |cur| *cur == b)
+                .expect("some way must exist");
             let directions = astar_paths
                 .into_iter()
                 .map(|path| {
@@ -103,20 +120,19 @@ fn precompute_directional_movement(
         .into_iter()
         .cartesian_product(DIRECTIONAL_BUTTON)
         .map(|(a, b)| {
-            let (astar_paths, _) = astar_bag(
-                &a,
-                |button| directional_pad_neighbours(button),
-                |_| 0,
-                |cur| *cur == b,
-            )
-            .expect("some way must exist");
-            let directions = astar_paths
+            let (astar_paths, _) =
+                astar_bag(&a, directional_pad_neighbours, |_| 0, |cur| *cur == b)
+                    .expect("some way must exist");
+            let directions: Vec<_> = astar_paths
                 .into_iter()
                 .map(|path| {
-                    path.into_iter()
+                    let mut path: Vec<_> = path
+                        .into_iter()
                         .tuple_windows()
                         .flat_map(|(a, b)| a.try_move_to(b))
-                        .collect()
+                        .collect();
+                    path.push(DirectionalButton::Activate);
+                    path
                 })
                 .collect();
             ((a, b), directions)
@@ -159,14 +175,14 @@ fn keypad_neighbours(button: &KeypadButton) -> Vec<(KeypadButton, usize)> {
 }
 
 fn get_input_sequence(
-    inputs: Vec<KeypadButton>,
+    inputs: &[KeypadButton],
     pre_compute: HashMap<(KeypadButton, KeypadButton), Vec<Vec<DirectionalButton>>>,
 ) -> Vec<Sequence> {
     let mut current = KeypadButton::Activate;
     let mut paths: Vec<Vec<DirectionalButton>> = vec![vec![]];
     for target in inputs {
         let possible_paths = pre_compute
-            .get(&(current, target))
+            .get(&(current, *target))
             .expect("there should always be a path");
         paths = paths
             .into_iter()
@@ -178,37 +194,7 @@ fn get_input_sequence(
                 current_path
             })
             .collect();
-        current = target;
-    }
-    paths
-        .into_iter()
-        .min_set_by(|p1, p2| p1.len().cmp(&p2.len()))
-        .into_iter()
-        .map(|path| Sequence { inner: path })
-        .collect()
-}
-
-fn convert_input_sequence(
-    inputs: Sequence,
-    pre_compute: &HashMap<(DirectionalButton, DirectionalButton), Vec<Vec<DirectionalButton>>>,
-) -> Vec<Sequence> {
-    let mut current = DirectionalButton::Activate;
-    let mut paths: Vec<Vec<DirectionalButton>> = vec![vec![]];
-    for target in inputs.inner {
-        let possible_paths = pre_compute
-            .get(&(current, target))
-            .expect("there should always be a path");
-        paths = paths
-            .into_iter()
-            .cartesian_product(possible_paths)
-            .map(|(mut current_path, next_steps)| {
-                let mut next_steps = next_steps.clone();
-                current_path.append(&mut next_steps);
-                current_path.push(DirectionalButton::Activate);
-                current_path
-            })
-            .collect();
-        current = target;
+        current = *target;
     }
     paths
         .into_iter()
@@ -227,12 +213,6 @@ fn parse(input: &str) -> Vec<KeypadButton> {
 
 struct Sequence {
     inner: Vec<DirectionalButton>,
-}
-
-impl Sequence {
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
 }
 
 impl Display for Sequence {
@@ -392,29 +372,14 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    #[case(
-        "029A",
-        "<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A"
-    )]
-    #[case("980A", "<v<A>>^AAAvA^A<vA<AA>>^AvAA<^A>A<v<A>A>^AAAvA<^A>A<vA>^A<A>A")]
-    #[case(
-        "179A",
-        "<v<A>>^A<vA<A>>^AAvAA<^A>A<v<A>>^AAvA^A<vA>^AA<A>A<v<A>A>^AAAvA<^A>A"
-    )]
-    #[case(
-        "456A",
-        "<v<A>>^AA<vA<A>>^AAvAA<^A>A<vA>^A<A>A<vA>^A<A>A<v<A>A>^AAvA<^A>A"
-    )]
-    #[case(
-        "379A",
-        "<v<A>>^AvA^A<vA<AA>>^AAvA<^A>AAvA^A<vA>^AA<A>A<v<A>A>^AAAvA<^A>A"
-    )]
-    fn test_complete(#[case] input: &str, #[case] result: &str) {
+    #[case("029A", 68 * 29)]
+    #[case("980A", 60 * 980)]
+    #[case("179A", 68 * 179)]
+    #[case("456A", 64 * 456)]
+    #[case("379A", 64 * 379)]
+    fn test_complete(#[case] input: &str, #[case] result: usize) {
         let inputs = parse(input);
-        assert!(part1(inputs)
-            .iter()
-            .map(|s| format!("{s}"))
-            .any(|s| &s == result))
+        assert_eq!(solve(&inputs, 2), result);
     }
 
     #[rstest]
@@ -425,10 +390,11 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)]
     fn test_029A() {
         let inputs = parse("029A");
         let pre_compute = precompute_keypad_movement();
-        let mut optional_paths: Vec<String> = get_input_sequence(inputs, pre_compute)
+        let mut optional_paths: Vec<String> = get_input_sequence(&inputs, pre_compute)
             .into_iter()
             .map(|p| format!("{p}"))
             .collect();
