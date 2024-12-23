@@ -1,3 +1,4 @@
+use cached::proc_macro::cached;
 use nom::{
     bytes::complete::tag,
     character::complete::{alpha1, line_ending},
@@ -6,103 +7,55 @@ use nom::{
     sequence::separated_pair,
     IResult,
 };
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 fn main() {
-    let input = include_str!("../demo.txt");
+    let input = include_str!("../input.txt");
     let (_input, (patterns, designs)) = parse(input).expect("valid parse");
-    let mut lookup: HashMap<char, Vec<String>> = HashMap::default();
+    let mut lookup_table: BTreeMap<char, Vec<String>> = BTreeMap::default();
     for pattern in patterns {
         let first: char = pattern.chars().next().expect("not empty");
-        lookup
+        lookup_table
             .entry(first)
             .and_modify(|x| x.push(pattern.to_owned()))
             .or_insert(vec![pattern.to_owned()]);
     }
-    let part1_result: usize = part1(&lookup, &designs);
+    let lookup_table = Arc::new(lookup_table);
+    let part1_result: usize = designs
+        .iter()
+        .filter(|design| lookup((**design).to_string(), lookup_table.clone()) > 0)
+        .count();
     println!("part1: {part1_result}");
 
-    let part2_result: usize = part2(&lookup, &designs);
+    let part2_result: usize = designs
+        .iter()
+        .map(|design| lookup((**design).to_string(), lookup_table.clone()))
+        .sum();
     println!("part2: {part2_result}");
 }
 
-fn part1(lookup: &HashMap<char, Vec<String>>, designs: &[&str]) -> usize {
-    let cache: Arc<RwLock<HashMap<String, Option<usize>>>> =
-        Arc::new(RwLock::new(HashMap::default()));
-    let r = designs
-        .iter()
-        .flat_map(|design| test_string(lookup, design, cache.clone()))
-        .count();
-    // dbg!(cache.read().unwrap().clone());
-    r
-}
-
-fn part2(lookup: &HashMap<char, Vec<String>>, designs: &[&str]) -> usize {
-    let cache: Arc<RwLock<HashMap<String, Option<usize>>>> =
-        Arc::new(RwLock::new(HashMap::default()));
-    let r = designs
-        .iter()
-        .flat_map(|design| test_string(lookup, design, cache.clone()))
-        .sum();
-    dbg!(cache.read().unwrap().clone());
-    r
-}
-
-fn test_string(
-    lookup: &HashMap<char, Vec<String>>,
-    design: &str,
-    cache: Arc<RwLock<HashMap<String, Option<usize>>>>,
-) -> Option<usize> {
-    if cache
-        .read()
-        .expect("reading should work")
-        .contains_key(design)
-    {
-        return *cache
-            .read()
-            .expect("reading should work")
-            .get(design)
-            .expect("since we are in here get should return Some");
+#[cached]
+fn lookup(current: String, lookup_table: Arc<BTreeMap<char, Vec<String>>>) -> usize {
+    if current.is_empty() {
+        return 1;
     }
-    let first: char = design.chars().next().expect("not empty");
-    let search_result = if let Some(pattern) = lookup.get(&first) {
+    let first: char = current.chars().next().expect("should not be empty");
+    if let Some(pattern) = lookup_table.get(&first) {
         pattern
             .iter()
-            .flat_map(|p| {
-                if *p == design {
-                    Some(1)
-                } else if p.len() <= design.len() && **p == design[0..p.len()] {
-                    if let Some(r) =
-                        test_string(lookup, &design[p.len()..design.len()], cache.clone())
-                    {
-                        Some(1 + r)
-                    } else {
-                        None
-                    }
+            .filter(|p| p.len() <= current.len())
+            .map(|p| {
+                if current.starts_with(p) {
+                    let current = current.chars().skip(p.len()).collect::<String>();
+                    lookup(current, lookup_table.clone())
                 } else {
-                    None
+                    0
                 }
             })
-            .min()
+            .sum()
     } else {
-        None
-    };
-    cache
-        .write()
-        .unwrap()
-        .insert(design.to_owned(), 1);
-        // .and_modify(|opt_x| {
-        //     if let Some(x) = opt_x {
-        //         *opt_x = Some(*x + 1);
-        //     } else {
-        //         *opt_x = Some(1)
-        //     }
-        // })
-        // .or_insert(Some(1))
-        // .clone()
+        0
+    }
 }
 
 fn parse_pattern(input: &str) -> IResult<&str, Vec<&str>> {
